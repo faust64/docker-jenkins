@@ -145,7 +145,7 @@ parameters:
 - description: Jenkins NodeJS Agent Dockerfile Root Directory
   displayName: Jenkins NodeJS Agent ContextDir
   name: JENKINS_NODE_CONTEXT
-  value: /
+  value: /jenkins-agent-node-sonar
 - description: Jenkins NodeJS Agent Repository
   displayName: Jenkins NodeJS Agent Repository
   name: JENKINS_NODE_GIT
@@ -157,7 +157,7 @@ parameters:
 - description: Jenkins Debian Agent Dockerfile Root Directory
   displayName: Jenkins Debian Agent ContextDir
   name: JENKINS_DEBIAN_CONTEXT
-  value: /
+  value: /jenkins-agent-debian
 - description: Jenkins Debian Agent Repository
   displayName: Jenkins Debian Agent Repository
   name: JENKINS_DEBIAN_GIT
@@ -169,7 +169,7 @@ parameters:
 - description: Jenkins CentOS Agent Dockerfile Root Directory
   displayName: Jenkins CentOS Agent ContextDir
   name: JENKINS_CENTOS_CONTEXT
-  value: /
+  value: /jenkins-agent-centos
 - description: Jenkins CentOS Agent Repository
   displayName: Jenkins CentOS Agent Repository
   name: JENKINS_CENTOS_GIT
@@ -181,7 +181,7 @@ parameters:
 - description: Jenkins Klar Agent Dockerfile Root Directory
   displayName: Jenkins Klar Agent ContextDir
   name: JENKINS_KLAR_CONTEXT
-  value: /
+  value: /jenkins-agent-klar
 - description: Jenkins Klar Agent Repository
   displayName: Jenkins Klar Agent Repository
   name: JENKINS_KLAR_GIT
