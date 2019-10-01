@@ -1,0 +1,84 @@
+FROM openshift/jenkins-slave-base-centos7
+
+ENV BASH_ENV=/usr/local/bin/scl_enable \
+    ENV=/usr/local/bin/scl_enable \
+    NODEJS_VERSION=10 \
+    NPM_CONFIG_PREFIX=$HOME/.npm-global \
+    PATH=$HOME/node_modules/.bin/:$HOME/.npm-global/bin/:$PATH \
+    SONAR_RUNNER_HOME=/opt/sonar-runner \
+    SONAR_RUNNER_VERSION=2.4 \
+    YARN_VERSION=1.17.3
+
+LABEL com.redhat.component="jenkins-agent-nodejs-${NODEJS_VERSION}-sonar${SONAR_RUNNER_VERSION}-centos7-container" \
+      io.k8s.description="The jenkins agent nodejs image has the nodejs tools on top of the jenkins slave base image." \
+      io.k8s.display-name="Jenkins Agent - Node.js ${NODEJS_VERSION} - Sonar scanner" \
+      io.openshift.tags="openshift,jenkins,agent,nodejs${NODEJS_VERSION},sonar${SONAR_RUNNER_VERSION},nodejs,sonar" \
+      architecture="x86_64" \
+      name="ci/jenkins-slave-node-${NODEJS_VERSION}-sonar${SONAR_RUNNER_VERSION}" \
+      maintainer="Samuel MARTIN MORO <faust64@gmail.com>" \
+      help="For more information visit https://github.com/faust64/docker-jenkins" \
+      version="${NODEJS_VERSION}"
+
+# Install NodeJS
+RUN if test "$DO_UPGRADE"; then \
+	yum -y upgrade; \
+    fi \
+    && yum remove -y rh-nodejs6\* rh-nodejs8\* \
+    && yum install -y --setopt=tsflags=nodocs make gcc-c++ subversion \
+	mercurial git wget curl unzip openssh ca-certificates procps-ng \
+	bash openssl-devel \
+    && yum localinstall -y \
+	http://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm \
+    && curl -sL https://rpm.nodesource.com/setup_${NODEJS_VERSION}.x | bash - \
+    && yum install -y --setopt=tsflags=nodocs gcc make gcc-c++ nodejs \
+    && curl --location \
+	https://github.com/yarnpkg/yarn/releases/download/v${YARN_VERSION}/yarn-v${YARN_VERSION}.tar.gz \
+	-o- | tar -C /opt -xzf - \
+    && yum remove -y epel-release python2-pip \
+    && yum clean all -y \
+    && rm -fr /var/cache/yum
+
+ENV PATH=/opt/yarn-v${YARN_VERSION}/bin:$PATH
+
+# Setup NodeJS modules - Fix Java
+RUN if test "$HTTP_PROXY"; then \
+	( \
+	    echo registry=http://registry.npmjs.org/ \
+	    && echo http-proxy=$HTTP_PROXY \
+	    && echo proxy=$HTTP_PROXY \
+	    && echo strict-ssl=false \
+	) >$HOME/.npmrc; \
+    fi \
+    && npm cache clean --force \
+    && npm install -g node-gyp pm2 mocha sonar-runner expect webpack \
+    && npm cache clean --force \
+    && for bin in java jre keytool servertool; \
+       do \
+           test -x /usr/bin/$bin -o -h /usr/bin/$bin && continue; \
+           find /usr/lib/jvm -name $bin | grep $(uname -m) | sort | tail -1 \
+	       | while read source; \
+	       do \
+		   ln -sf $source /usr/bin/$bin; \
+	       done; \
+       done \
+    && rm -fr /tmp/npm* ${HOME}/.npm $HOME/.npmrc \
+    && if test -s /run/secrets/kubernetes.io/serviceaccount/service-ca.crt; then \
+	chmod 0666 /etc/pki/ca-trust/extracted/java/cacerts \
+	&& keytool -importcert -alias Root_CA -keystore /etc/pki/ca-trust/extracted/java/cacerts -file /run/secrets/kubernetes.io/serviceaccount/service-ca.crt -storepass changeit --noprompt \
+	&& chmod 0444 /etc/pki/ca-trust/extracted/java/cacerts \
+	&& cat /run/secrets/kubernetes.io/serviceaccount/service-ca.crt >/etc/pki/ca-trust/source/anchors/k8s-ca.pem \
+	&& chmod 0644 /etc/pki/ca-trust/source/anchors/k8s-ca.pem \
+	&& update-ca-certificates; \
+    fi
+
+# Install Sonar Runner
+RUN mkdir -p /opt \
+    && wget http://repo1.maven.org/maven2/org/codehaus/sonar/runner/sonar-runner-dist/${SONAR_RUNNER_VERSION}/sonar-runner-dist-${SONAR_RUNNER_VERSION}.zip \
+    && unzip sonar-runner-dist-${SONAR_RUNNER_VERSION}.zip \
+    && mv sonar-runner-${SONAR_RUNNER_VERSION} /opt/sonar-runner \
+    && rm -rf sonar-runner-dist-${SONAR_RUNNER_VERSION}.zip /opt/sonar-runner/conf/sonar-runner.properties \
+    && chown -R 1001:0 $HOME $SONAR_RUNNER_HOME \
+    && chmod -R g+rw $HOME $SONAR_RUNNER_HOME
+ENV PATH $SONAR_RUNNER_HOME/bin:$PATH
+
+USER 1001

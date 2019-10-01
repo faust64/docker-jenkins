@@ -1,0 +1,437 @@
+apiVersion: v1
+kind: Template
+labels:
+  app: jenkins-persistent
+  template: jenkins-persistent-template
+message: A Jenkins service has been created in your project.  Log into Jenkins with
+  your OpenShift account.  The tutorial at https://github.com/openshift/origin/blob/master/examples/jenkins/README.md
+  contains more information about using this template.
+metadata:
+  annotations:
+    description: |-
+      Jenkins service, with persistent storage.
+
+      NOTE: You must have persistent volumes available in your cluster to use this template.
+    iconClass: icon-jenkins
+    openshift.io/display-name: Jenkins
+    openshift.io/documentation-url: https://docs.openshift.org/latest/using_images/other_images/jenkins.html
+    openshift.io/long-description: This template deploys a Jenkins server capable
+      of managing OpenShift Pipeline builds and supporting OpenShift-based oauth login.
+    tags: jenkins
+  name: jenkins-persistent
+objects:
+- apiVersion: v1
+  kind: LimitRange
+  metadata:
+    name: limitrange-${JENKINS_SERVICE_NAME}
+  spec:
+    limits:
+    - default:
+        cpu: "${JENKINS_LR_CPU_LIMIT}"
+        memory: ${JENKINS_LR_MEMORY_LIMIT}
+      defaultRequest:
+        cpu: "${JENKINS_LR_CPU_REQUEST}"
+        memory: ${JENKINS_LR_MEMORY_REQUEST}
+      type: Container
+- apiVersion: v1
+  kind: ResourceQuota
+  metadata:
+    name: quota-${JENKINS_SERVICE_NAME}
+  spec:
+    hard:
+      limits.cpu: "${JENKINS_CPU_QUOTA}"
+      limits.memory: ${JENKINS_MEMORY_QUOTA}
+      pods: "${JENKINS_POD_QUOTA}"
+- apiVersion: v1
+  data:
+    template1: |-
+      <org.csanchez.jenkins.plugins.kubernetes.PodTemplate>
+        <inheritFrom></inheritFrom>
+        <name>maven</name>
+        <instanceCap>2147483647</instanceCap>
+        <idleMinutes>0</idleMinutes>
+        <label>maven</label>
+        <serviceAccount>jenkins</serviceAccount>
+        <nodeSelector></nodeSelector>
+        <volumes/>
+        <containers>
+          <org.csanchez.jenkins.plugins.kubernetes.ContainerTemplate>
+            <name>jnlp</name>
+            <image>docker.io/openshift/jenkins-slave-maven-centos7</image>
+            <privileged>false</privileged>
+            <alwaysPullImage>false</alwaysPullImage>
+            <workingDir>/tmp</workingDir>
+            <command></command>
+            <args>${computer.jnlpmac} ${computer.name}</args>
+            <ttyEnabled>false</ttyEnabled>
+            <resourceRequestCpu>200m</resourceRequestCpu>
+            <resourceRequestMemory>512Mi</resourceRequestMemory>
+            <resourceLimitCpu>300m</resourceLimitCpu>
+            <resourceLimitMemory>1Gi</resourceLimitMemory>
+            <envVars/>
+          </org.csanchez.jenkins.plugins.kubernetes.ContainerTemplate>
+        </containers>
+        <envVars/>
+        <annotations/>
+        <imagePullSecrets/>
+        <nodeProperties/>
+      </org.csanchez.jenkins.plugins.kubernetes.PodTemplate>
+    template2: |-
+      <org.csanchez.jenkins.plugins.kubernetes.PodTemplate>
+        <inheritFrom></inheritFrom>
+        <name>base</name>
+        <instanceCap>2147483647</instanceCap>
+        <idleMinutes>0</idleMinutes>
+        <label>base</label>
+        <serviceAccount>jenkins</serviceAccount>
+        <nodeSelector></nodeSelector>
+        <volumes/>
+        <containers>
+          <org.csanchez.jenkins.plugins.kubernetes.ContainerTemplate>
+            <name>jnlp</name>
+            <image>docker.io/openshift/jenkins-slave-base-centos7</image>
+            <privileged>false</privileged>
+            <alwaysPullImage>false</alwaysPullImage>
+            <workingDir>/tmp</workingDir>
+            <command></command>
+            <args>${computer.jnlpmac} ${computer.name}</args>
+            <ttyEnabled>false</ttyEnabled>
+            <resourceRequestCpu>100m</resourceRequestCpu>
+            <resourceRequestMemory>256Mi</resourceRequestMemory>
+            <resourceLimitCpu>200m</resourceLimitCpu>
+            <resourceLimitMemory>512Mi</resourceLimitMemory>
+            <envVars/>
+          </org.csanchez.jenkins.plugins.kubernetes.ContainerTemplate>
+        </containers>
+        <envVars/>
+        <annotations/>
+        <imagePullSecrets/>
+        <nodeProperties/>
+      </org.csanchez.jenkins.plugins.kubernetes.PodTemplate>
+    template3: |-
+      <org.csanchez.jenkins.plugins.kubernetes.PodTemplate>
+        <inheritFrom></inheritFrom>
+        <name>node</name>
+        <instanceCap>2147483647</instanceCap>
+        <idleMinutes>0</idleMinutes>
+        <label>node</label>
+        <serviceAccount>jenkins</serviceAccount>
+        <nodeSelector></nodeSelector>
+        <volumes/>
+        <containers>
+          <org.csanchez.jenkins.plugins.kubernetes.ContainerTemplate>
+            <name>jnlp</name>
+            <image>docker.io/openshift/jenkins-agent-nodejs-8-centos7</image>
+            <privileged>false</privileged>
+            <alwaysPullImage>false</alwaysPullImage>
+            <workingDir>/tmp</workingDir>
+            <command></command>
+            <args>${computer.jnlpmac} ${computer.name}</args>
+            <ttyEnabled>false</ttyEnabled>
+            <resourceRequestCpu>500m</resourceRequestCpu>
+            <resourceRequestMemory>3Gi</resourceRequestMemory>
+            <resourceLimitCpu>800m</resourceLimitCpu>
+            <resourceLimitMemory>4Gi</resourceLimitMemory>
+            <envVars/>
+          </org.csanchez.jenkins.plugins.kubernetes.ContainerTemplate>
+        </containers>
+        <envVars/>
+        <annotations/>
+        <imagePullSecrets/>
+        <nodeProperties/>
+      </org.csanchez.jenkins.plugins.kubernetes.PodTemplate>
+  kind: ConfigMap
+  metadata:
+    labels:
+      role: jenkins-slave
+    name: ${JENKINS_SERVICE_NAME}-podtemplates
+- apiVersion: v1
+  data:
+    hudson.plugins.git.GitSCM.xml: |-
+      <?xml version='1.1' encoding='UTF-8'?>
+      <hudson.plugins.git.GitSCM_-DescriptorImpl plugin="git@3.9.1">
+        <generation>1</generation>
+        <globalConfigName>jenkins</globalConfigName>
+        <globalConfigEmail>jenkins@${JENKINS_MAIL_DOMAIN}</globalConfigEmail>
+        <createAccountBasedOnEmail>false</createAccountBasedOnEmail>
+      </hudson.plugins.git.GitSCM_-DescriptorImpl>
+    hudson.plugins.sonar.SonarGlobalConfiguration.xml: |-
+      <?xml version='1.1' encoding='UTF-8'?>
+      <hudson.plugins.sonar.SonarGlobalConfiguration plugin="sonar@2.8">
+        <installations>
+          <hudson.plugins.sonar.SonarInstallation>
+            <name>cicd</name>
+            <serverUrl>http://admin:admin@sonarqube:9000/</serverUrl>
+            <serverAuthenticationToken></serverAuthenticationToken>
+            <mojoVersion></mojoVersion>
+            <additionalProperties></additionalProperties>
+            <additionalAnalysisProperties></additionalAnalysisProperties>
+            <triggers>
+              <skipScmCause>false</skipScmCause>
+              <skipUpstreamCause>false</skipUpstreamCause>
+              <envVar></envVar>
+            </triggers>
+          </hudson.plugins.sonar.SonarInstallation>
+        </installations>
+        <buildWrapperEnabled>false</buildWrapperEnabled>
+        <dataMigrated>true</dataMigrated>
+      </hudson.plugins.sonar.SonarGlobalConfiguration>
+    hudson.tasks.Mailer.xml: |-
+      <?xml version='1.1' encoding='UTF-8'?>
+      <hudson.tasks.Mailer_-DescriptorImpl plugin="mailer@1.21">
+        <defaultSuffix>@${JENKINS_MAIL_DOMAIN}</defaultSuffix>
+        <smtpHost>${JENKINS_MAIL_RELAY}</smtpHost>
+        <useSsl>false</useSsl>
+        <charset>UTF-8</charset>
+      </hudson.tasks.Mailer_-DescriptorImpl>
+  kind: ConfigMap
+  metadata:
+    name: ${JENKINS_SERVICE_NAME}-conf
+- apiVersion: v1
+  kind: Route
+  metadata:
+    annotations:
+      haproxy.router.openshift.io/timeout: 4m
+      template.openshift.io/expose-uri: http://{.spec.host}{.spec.path}
+    name: ${JENKINS_SERVICE_NAME}
+  spec:
+    tls:
+      insecureEdgeTerminationPolicy: Redirect
+      termination: edge
+    to:
+      kind: Service
+      name: ${JENKINS_SERVICE_NAME}
+- apiVersion: v1
+  kind: PersistentVolumeClaim
+  metadata:
+    name: ${JENKINS_SERVICE_NAME}
+  spec:
+    accessModes:
+    - ReadWriteOnce
+    resources:
+      requests:
+        storage: ${VOLUME_CAPACITY}
+- apiVersion: v1
+  kind: DeploymentConfig
+  metadata:
+    name: ${JENKINS_SERVICE_NAME}
+  spec:
+    replicas: 1
+    selector:
+      name: ${JENKINS_SERVICE_NAME}
+    strategy:
+      recreateParams:
+        timeoutSeconds: 900
+      type: Recreate
+    template:
+      metadata:
+        labels:
+          name: ${JENKINS_SERVICE_NAME}
+      spec:
+        containers:
+        - capabilities: {}
+          env:
+          - name: OPENSHIFT_ENABLE_OAUTH
+            value: ${ENABLE_OAUTH}
+          - name: OPENSHIFT_ENABLE_REDIRECT_PROMPT
+            value: "true"
+          - name: DISABLE_ADMINISTRATIVE_MONITORS
+            value: ${DISABLE_ADMINISTRATIVE_MONITORS}
+          - name: INSTALL_PLUGINS
+            value: sonar,gitlab-hook,generic-webhook-trigger,gogs-webhook,pipeline-npm,gitlab,nexus-artifact-uploader,kubernetes-credentials-provider,http_request,accelerated-build-now-plugin,active-directory,analysis-core,ant,antisamy-markup-formatter,artifactdeployer,build-failure-analyzer,build-name-setter,conditional-buildstep,configurationslicing,custom-tools-plugin,cvs,description-setter,disk-usage,docker-plugin,docker-slaves,durable-task,elastic-axis,email-ext,envinject,external-monitor-job,gerrit-trigger,git-parameter,groovy-label-assignment,PrioritySorter,postbuild-task,jobConfigHistory,leastload,mapdb-api,monitoring,mask-passwords,periodic-reincarnation,plot,preSCMbuildstep,project-stats-plugin,purge-build-queue-plugin,release,repo,slave-setup,slave-status,ssh-agent,throttle-concurrents,timestamper,translation,warnings
+          - name: KUBERNETES_MASTER
+            value: https://kubernetes.default:443
+          - name: KUBERNETES_TRUST_CERTIFICATES
+            value: "true"
+          - name: JENKINS_SERVICE_NAME
+            value: ${JENKINS_SERVICE_NAME}
+          - name: JNLP_SERVICE_NAME
+            value: ${JNLP_SERVICE_NAME}
+          - name: TZ
+            value: Europe/Paris
+          - name: JAVA_GC_OPTS
+            value: -XX:+UseG1GC -XX:+UseStringDeduplication -XX:+ParallelRefProcEnabled -XX:+ExplicitGCInvokesConcurrent -XX:+UnlockDiagnosticVMOptions -XX:G1SummarizeRSetStatsPeriod=1 -XX:MaxMetaspaceExpansion=64M -XX:+UnlockExperimentalVMOptions -XX:G1NewSizePercent=20
+          - name: JAVA_OPTS
+            value: -Dhudson.tasks.MailSender.SEND_TO_UNKNOWN_USERS=true
+          image: "${JENKINS_IMAGE_ADDRESS}"
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            failureThreshold: 20
+            httpGet:
+              path: /login
+              port: 8080
+            initialDelaySeconds: 120
+            periodSeconds: 30
+            timeoutSeconds: 10
+          name: jenkins
+          readinessProbe:
+            httpGet:
+              path: /login
+              port: 8080
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            timeoutSeconds: 10
+          resources:
+            requests:
+              cpu: ${JENKINS_CPU_REQUEST}
+              memory: ${JENKINS_MEMORY_REQUEST}
+            limits:
+              cpu: ${JENKINS_CPU_LIMIT}
+              memory: ${JENKINS_MEMORY_LIMIT}
+          terminationMessagePath: /dev/termination-log
+          volumeMounts:
+          - mountPath: /var/lib/jenkins
+            name: ${JENKINS_SERVICE_NAME}-data
+          - mountPath: /var/lib/jenkins/caches
+            name: ${JENKINS_SERVICE_NAME}-cache
+          - mountPath: /var/lib/jenkins/hudson.plugins.git.GitSCM.xml
+            name: ${JENKINS_SERVICE_NAME}-conf
+            subPath: hudson.plugins.git.GitSCM.xml
+          - mountPath: /var/lib/jenkins/hudson.plugins.sonar.SonarGlobalConfiguration.xml
+            name: ${JENKINS_SERVICE_NAME}-conf
+            subPath: hudson.plugins.sonar.SonarGlobalConfiguration.xml
+          - mountPath: /var/lib/jenkins/hudson.tasks.Mailer.xml
+            name: ${JENKINS_SERVICE_NAME}-conf
+            subPath: hudson.tasks.Mailer.xml
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        serviceAccountName: ${JENKINS_SERVICE_NAME}
+        volumes:
+        - name: ${JENKINS_SERVICE_NAME}-data
+          persistentVolumeClaim:
+            claimName: ${JENKINS_SERVICE_NAME}
+        - emptyDir: {}
+          name: ${JENKINS_SERVICE_NAME}-cache
+        - configMap:
+            defaultMode: 420
+            name: ${JENKINS_SERVICE_NAME}-conf
+          name: ${JENKINS_SERVICE_NAME}-conf
+    triggers:
+    - type: ConfigChange
+- apiVersion: v1
+  kind: ServiceAccount
+  metadata:
+    annotations:
+      serviceaccounts.openshift.io/oauth-redirectreference.jenkins: '{"kind":"OAuthRedirectReference","apiVersion":"v1","reference":{"kind":"Route","name":"${JENKINS_SERVICE_NAME}"}}'
+    name: ${JENKINS_SERVICE_NAME}
+- apiVersion: v1
+  groupNames: null
+  kind: RoleBinding
+  metadata:
+    name: ${JENKINS_SERVICE_NAME}_edit
+  roleRef:
+    name: edit
+  subjects:
+  - kind: ServiceAccount
+    name: ${JENKINS_SERVICE_NAME}
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: ${JNLP_SERVICE_NAME}
+  spec:
+    ports:
+    - name: agent
+      nodePort: 0
+      port: 50000
+      protocol: TCP
+      targetPort: 50000
+    selector:
+      name: ${JENKINS_SERVICE_NAME}
+    sessionAffinity: None
+    type: ClusterIP
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      service.alpha.openshift.io/dependencies: '[{"name": "${JNLP_SERVICE_NAME}", "namespace": "", "kind": "Service"}]'
+      service.openshift.io/infrastructure: "true"
+    name: ${JENKINS_SERVICE_NAME}
+  spec:
+    ports:
+    - name: web
+      nodePort: 0
+      port: 80
+      protocol: TCP
+      targetPort: 8080
+    selector:
+      name: ${JENKINS_SERVICE_NAME}
+    sessionAffinity: None
+    type: ClusterIP
+parameters:
+- description: Whether to perform memory intensive, possibly slow, synchronization with the Jenkins Update Center on start. If true, the Jenkins core update monitor and site warnings monitor are disabled.
+  displayName: Disable memory intensive administrative monitors
+  name: DISABLE_ADMINISTRATIVE_MONITORS
+  value: "false"
+- description: Whether to enable OAuth OpenShift integration. If false, the static account 'admin' will be initialized with the password 'password'.
+  displayName: Enable OAuth in Jenkins
+  name: ENABLE_OAUTH
+  value: "true"
+- description: Maximum amount of CPU the container can use.
+  displayName: CPU Limit
+  name: JENKINS_CPU_LIMIT
+  value: 500m
+- description: Jenkins Project CPU Quota
+  displayName: Jenkins Project CPU Quota
+  name: JENKINS_CPU_QUOTA
+  value: "10"
+- description: Maximum amount of CPU the container requests.
+  displayName: CPU Request
+  name: JENKINS_CPU_REQUEST
+  value: 200m
+- description: Jenkins image URL
+  displayName: Jenkins Image URL
+  name: JENKINS_IMAGE_ADDRESS
+  value: docker.io/openshift/jenkins-2-centos7:latest
+- description: Jenkins LimitRange default CPU Limit
+  displayName: Jenkins LimitRange default CPU Limit
+  value: 200m
+  name: JENKINS_LR_CPU_LIMIT
+- description: Jenkins LimitRange default CPU Request
+  displayName: Jenkins LimitRange default CPU Request
+  name: JENKINS_LR_CPU_REQUEST
+  value: 100m
+- description: Jenkins LimitRange default Memory Limit
+  displayName: Jenkins LimitRange default Memory Limit
+  name: JENKINS_LR_MEMORY_LIMIT
+  value: 2Gi
+- description: Jenkins LimitRange default Memory Request
+  displayName: Jenkins LimitRange default Memory Request
+  name: JENKINS_LR_MEMORY_REQUEST
+  value: 512Mi
+- description: Jenkins Mail Domain
+  displayName: Jenkins Mail Domain
+  name: JENKINS_MAIL_DOMAIN
+  value: demo.local
+- description: Jenkins Mail Relay
+  displayName: Jenkins Mail Relay
+  name: JENKINS_MAIL_RELAY
+  value: smtp.demo.local
+- description: Maximum amount of memory the container can use.
+  displayName: Memory Limit
+  name: JENKINS_MEMORY_LIMIT
+  value: 3Gi
+- description: Jenkins Project Memory Quota
+  displayName: Jenkins Project Memory Quota
+  name: JENKINS_MEMORY_QUOTA
+  value: 32Gi
+- description: Maximum amount of memory the container requests.
+  displayName: Memory Request
+  name: JENKINS_MEMORY_REQUEST
+  value: 1Gi
+- description: Jenkins Project Pod Quota
+  displayName: Jenkins Project Pod Quota
+  name: JENKINS_POD_QUOTA
+  value: "42"
+- description: The name of the OpenShift Service exposed for the Jenkins container.
+  displayName: Jenkins Service Name
+  name: JENKINS_SERVICE_NAME
+  value: jenkins
+- description: The name of the service used for master/slave communication.
+  displayName: Jenkins JNLP Service Name
+  name: JNLP_SERVICE_NAME
+  value: jenkins-jnlp
+- description: Volume space available for data, e.g. 512Mi, 2Gi.
+  displayName: Volume Capacity
+  name: VOLUME_CAPACITY
+  required: true
+  value: 42Gi
