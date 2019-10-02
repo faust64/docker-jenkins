@@ -28,10 +28,14 @@ LABEL com.redhat.component="jenkins-agent-klar" \
 
 COPY --from=builder /klar /usr/local/bin/klar
 
-RUN yum -y install epel-release \
-    && if test "$DO_UPGRADE"; then \
-	yum -y upgrade; \
-    fi \
-    && yum -y install ca-certificates jq
+RUN if yum -y install epel-release; then \
+	if test "$DO_UPGRADE"; then \
+	    yum -y upgrade; \
+	fi \
+	&& yum -y install ca-certificates jq; \
+    else \
+	curl https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o /usr/bin/jq; \
+	&& chmod +x /usr/bin/jq; \
+    fi
 
 USER 1001
